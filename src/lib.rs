@@ -1,6 +1,8 @@
 //! Rolling Hashの試験的実装
 use std::{num::NonZero, ops::Deref};
 
+pub mod bidirectional;
+
 pub mod multi;
 
 pub(crate) mod mock;
