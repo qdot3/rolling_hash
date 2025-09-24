@@ -5,6 +5,9 @@ pub mod bidirectional;
 
 pub mod multi;
 
+mod convert;
+pub use convert::Reduce;
+
 pub(crate) mod mock;
 pub(crate) use mock::cold_path;
 
@@ -71,7 +74,7 @@ macro_rules! supported_base_count_impl {
 }
 supported_base_count_impl! { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }
 
-/// Note the value may be incorrect due to hash collisions.
+/// A value that may be incorrect due to hash collisions.
 pub struct Maybe<T>(T);
 
 impl<T> Deref for Maybe<T> {
@@ -204,7 +207,7 @@ where
     ///
     /// *O*(log *exp*)
     pub fn pow_mod(mut value: u64, mut exp: u64) -> u64 {
-        let mut result = 1;
+        let mut result = 1; // P >> 1
         while exp > 0 {
             if exp & 1 == 1 {
                 result = Self::mul_mod(result, value);
@@ -241,11 +244,20 @@ where
         }
     }
 
+    /// Same as [`Vec::reserve`].
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.hashed.reserve(additional);
+        self.source.reserve(additional);
+    }
+
+    /// Returns the number of elements in `self`.
     #[inline]
     pub const fn len(&self) -> usize {
         self.source.len()
     }
 
+    /// Returns `true` if `self` has a length of 0, and `false` otherwise.
     #[inline]
     pub const fn is_empty(&self) -> bool {
         self.source.is_empty()
@@ -271,10 +283,28 @@ where
     /// # Time complexity
     ///
     /// *O*(*BM*), where *M* is `slice.len()`.
-    fn hash_slice(&self, slice: &[u64]) -> [u64; B] {
+    fn hash_slice(
+        &self,
+        slice: &[u64], /* intentional: iterator may skip some elements */
+    ) -> [u64; B] {
         slice
             .into_iter()
             .fold([0; B], |prev, next| self.hash_next(&prev, next % P))
+    }
+
+    /// Helper function to calculated `hashed` field.
+    ///
+    /// # Time complexity
+    ///
+    /// *O*(*BM*), where *M* is `iter.count()`.
+    fn scan_and_hash_iter<'a>(&self, iter: impl IntoIterator<Item = &'a u64>) -> Vec<[u64; B]> {
+        iter.into_iter()
+            .scan([0; B], |prev, next| {
+                *prev = self.hash_next(&prev, next % P);
+                Some(*prev)
+            })
+            // intentional: all elements should be allocated in this order
+            .collect()
     }
 
     /// Appends an element to the back of `self`.
@@ -299,8 +329,7 @@ where
     ///
     /// *O*(*BM*), where *M* is `other.len()`
     pub fn append(&mut self, other: &mut Vec<u64>) {
-        self.source.reserve(other.len());
-        self.hashed.reserve(other.len());
+        self.reserve(other.len());
         for value in other.drain(..) {
             self.push(value);
         }
@@ -308,7 +337,7 @@ where
 
     /// # Panics
     ///
-    /// Panics if `size == 0`
+    /// Panics if `size` is `0`.
     ///
     /// # Time complexity
     ///
@@ -322,7 +351,7 @@ where
     ///
     /// # Time complexity
     ///
-    /// *O*(*B* log *M* + *BN*), where *M* is `slice.len()` and `N` is `self.len()`.
+    /// *O*(*BN*), where *N* is `self.len()`.
     pub fn position(&self, slice: &[u64]) -> Option<Maybe<usize>> {
         let target = self.hash_slice(slice);
         self.windows(slice.len())
@@ -334,7 +363,7 @@ where
     ///
     /// # Time complexity
     ///
-    /// *O*(*B* log *M* + *BN*), where *M* is `slice.len()` and `N` is `self.len()`.
+    /// *O*(*BN*), where *N* is `self.len()`.
     pub fn rposition(&self, slice: &[u64]) -> Option<Maybe<usize>> {
         let target = self.hash_slice(slice);
         self.windows(slice.len())
@@ -346,7 +375,7 @@ where
     ///
     /// # Time complexity
     ///
-    /// *O*(*B* log *M* + *BN*), where *M* is `slice.len()` and `N` is `self.len()`.
+    /// *O*(*BN*), where *N* is `self.len()`.
     pub fn positions(&self, slice: &[u64]) -> impl Iterator<Item = Maybe<usize>> {
         let target = self.hash_slice(slice);
         self.windows(slice.len())
@@ -358,7 +387,7 @@ where
     ///
     /// # Time complexity
     ///
-    /// *O*(*B* log *M* + *BN*), where *M* is `slice.len()` and `N` is `self.len()`.
+    /// *O*(*BN*), where *N* is `self.len()`.
     pub fn count(&self, slice: &[u64]) -> Maybe<usize> {
         let target = self.hash_slice(slice);
         Maybe(
@@ -368,3 +397,4 @@ where
         )
     }
 }
+
