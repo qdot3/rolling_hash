@@ -1,6 +1,6 @@
 /// A hashable type.
 pub trait RollingHash {
-    fn write();
+    fn write(&self);
 
     fn hash_slice(&self);
 }

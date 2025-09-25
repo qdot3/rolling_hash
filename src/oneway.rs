@@ -1,8 +1,6 @@
 use std::num::NonZero;
 
-use crate::{
-    BaseCount, Maybe, Prime, SupportedBaseCount, SupportedPrime, Windows, cold_path, mul_mod,
-};
+use crate::{BaseCount, Maybe, Prime, SupportedBaseCount, SupportedPrime, Windows, cold_path};
 
 pub struct OneWay<const P: u64, const B: usize>
 where
@@ -54,19 +52,32 @@ where
         self.hash.is_empty()
     }
 
+    /// Returns bases randomly generated at runtime.
+    ///
+    /// # Time Complexity
+    ///
+    /// *O*(*B*)
+    pub fn base(&self) -> [u64; B] {
+        self.base
+    }
+
+    pub(crate) fn get_hash(&self) -> &[[u64; B]] {
+        &self.hash
+    }
+
     /// Hashes `next` by using this hasher.
     /// You can simply push the result to the `hashed` field (and `next` to the `source` field).
     ///
     /// # Constraints
     ///
-    /// `next % P`
+    /// `next < P`
     ///
     /// # Time complexity
     ///
     /// *O*(*B*)
     #[inline]
     fn hash_next(&self, prev: &[u64; B], next: u64) -> [u64; B] {
-        std::array::from_fn(|i| (mul_mod::<P>(prev[i], self.base[i]) + next) % P)
+        std::array::from_fn(|i| (Prime::<P>::mul_mod(prev[i], self.base[i]) + next) % P)
     }
 
     /// Hashes `slice` by using `self`.
@@ -119,8 +130,7 @@ where
     /// *O*(*B*)
     fn windows(&self, size: usize) -> Windows<'_, P, B> {
         let size = NonZero::new(size).expect("window size must be non-zero");
-        todo!("fix this")
-        // Windows::new(self, size)
+        Windows::new(self, size)
     }
 
     /// Searches for an sub slice in `self`, returning its index.

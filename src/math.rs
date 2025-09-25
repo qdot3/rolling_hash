@@ -1,37 +1,51 @@
+//! legacy
+
 /// Performs `lhs + rhs % P` without overflow.
 ///
 /// # Constraints
 ///
-/// `lhs, rhs < P` should be holds.
+/// `lhs, rhs < P`.
 /// Otherwise, overflow may or may not occur.
+///
+/// # Compile-time panics
+///
+/// Panics if `P` is invalid.
+/// Use [predefined prime numbers](crate::PRIMES).
 ///
 /// # Time complexity
 ///
 /// *O*(1)
 pub(crate) const fn mul_mod<const P: u64>(lhs: u64, rhs: u64) -> u64 {
-    // ==================================================
-    // values here will be evaluated in compile time
+    let (exp, diff, bits_l, mask_l) = const {
+        // P = 2^EXP - DIFF
+        //
+        // # Constraints
+        //
+        // - EXP <= 61
+        // - (1 <=) DIFF <= 2^min(64-EXP, floor(EXP/2))
+        let exp = P.next_power_of_two().ilog2() as u64;
+        assert!(
+            exp >= 55,
+            "[option] this constraints is NOT necessary. larger is better"
+        );
+        assert!(exp <= 61, "[bug] P should be less than 2^61 - 1.");
 
-    // P = 2^EXP - DIFF
-    //
-    // # Constraints
-    //
-    // - EXP <= 61
-    // - (1 <=) DIFF <= 2^min(64-EXP, floor(EXP/2))
-    let exp = const { P.next_power_of_two().ilog2() as u64 };
-    let diff = const { P.next_power_of_two() - P };
+        let diff = (1 << exp) - P;
+        assert!(
+            (1 << exp) * diff <= u64::MAX && diff < (1 << (exp / 2)),
+            "[bug] given is inappropriate prime number. overflow may occur."
+        );
 
-    let _check1 = const { 61 - P.next_power_of_two().ilog2() };
-    let _check2 = const { P.next_power_of_two() * (P.next_power_of_two() - P) };
-    let _check3 = const { (1 << P.next_power_of_two().ilog2() / 2) - (P.next_power_of_two() - P) };
+        // u: ⎿ EXP / 2 ⏌
+        // l: ⎾ EXP / 2 ⏋
+        let bits_l = (exp + 1) / 2;
+        let mask_l = (1 << bits_l) - 1;
 
-    // u: ⎿ EXP / 2 ⏌
-    // l: ⎾ EXP / 2 ⏋
-    let lower_bits = (exp + 1) / 2;
-    let lower_mask = (1 << lower_bits) - 1;
+        (exp, diff, bits_l, mask_l)
+    };
 
-    let (lhs_l, lhs_u) = (lhs & lower_mask, lhs >> lower_bits);
-    let (rhs_l, rhs_u) = (rhs & lower_mask, rhs >> lower_bits);
+    let (lhs_l, lhs_u) = (lhs & mask_l, lhs >> bits_l);
+    let (rhs_l, rhs_u) = (rhs & mask_l, rhs >> bits_l);
     // ==================================================
 
     // lhs_u * rhs_u * 2^(2l) % (2^EXP - DIFF)
@@ -78,8 +92,8 @@ pub(crate) const fn mul_mod<const P: u64>(lhs: u64, rhs: u64) -> u64 {
     // - EXP <= 62
     let cross = {
         let cross = lhs_u * rhs_l + lhs_l * rhs_u;
-        let (cross_l, cross_u) = (cross & lower_mask, cross >> lower_bits);
-        cross_u * (exp % 2 + 1) * diff + (cross_l << lower_bits)
+        let (cross_l, cross_u) = (cross & mask_l, cross >> bits_l);
+        cross_u * (exp % 2 + 1) * diff + (cross_l << bits_l)
     };
 
     // lhs_l * rhs_l < 2^(2l)
@@ -106,6 +120,10 @@ pub(crate) const fn mul_mod<const P: u64>(lhs: u64, rhs: u64) -> u64 {
 ///
 /// `value < P` should be holds.
 /// Otherwise, overflow may or may not occur.
+///
+/// # Panics
+///
+/// See [`mul_mod`].
 ///
 /// # Time complexity
 ///
