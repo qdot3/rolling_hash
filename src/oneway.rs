@@ -65,7 +65,7 @@ where
         &self.hash
     }
 
-    /// Hashes `next` by using this hasher.
+    /// Hashes `next` by using `self`.
     /// You can simply push the result to the `hashed` field (and `next` to the `source` field).
     ///
     /// # Constraints

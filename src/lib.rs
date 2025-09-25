@@ -31,11 +31,8 @@
 //! 基数の数に比例してき計算時間が増大するので、少数に制限するのが良く、arrayで十分。
 use std::ops::Deref;
 
-
 mod prime;
 pub use prime::{PRIMES, Prime, SupportedPrime};
-
-mod traits;
 
 mod oneway;
 pub use oneway::OneWay;
