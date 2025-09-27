@@ -23,7 +23,7 @@ where
         Self {
             hash: hasher.get_hash(),
             size,
-            base_or_offset: hasher.base(),
+            base_or_offset: hasher.base().clone(),
             base_pow_size: OnceCell::new(),
         }
     }

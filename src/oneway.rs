@@ -34,6 +34,29 @@ where
         }
     }
 
+    /// Creates a new instance with specified bases.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of bases are `1` or `P - 1`.
+    pub const fn with_base(mut base: [u64; B]) -> Self {
+        let mut i = 0;
+        while i < B {
+            assert!(
+                base[i] != 1 || base[i] == P - 1,
+                "invalid base: base should be in 2..=P - 2"
+            );
+
+            base[i] %= P;
+            i += 1;
+        }
+
+        Self {
+            base,
+            hash: Vec::new(),
+        }
+    }
+
     /// Same as [`Vec::reserve`].
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
@@ -57,8 +80,8 @@ where
     /// # Time Complexity
     ///
     /// *O*(*B*)
-    pub fn base(&self) -> [u64; B] {
-        self.base
+    pub fn base(&self) -> &[u64; B] {
+        &self.base
     }
 
     pub(crate) fn get_hash(&self) -> &[[u64; B]] {
@@ -70,7 +93,7 @@ where
     ///
     /// # Constraints
     ///
-    /// `next < P`
+    /// `next < P`, otherwise overflow may or may not occur.
     ///
     /// # Time complexity
     ///
@@ -129,7 +152,7 @@ where
     ///
     /// *O*(*B*)
     fn windows(&self, size: usize) -> Windows<'_, P, B> {
-        let size = NonZero::new(size).expect("window size must be non-zero");
+        let size = NonZero::new(size).expect("slice must not be empty");
         Windows::new(self, size)
     }
 
@@ -181,15 +204,5 @@ where
                 .filter(|sub_slice| sub_slice == &target)
                 .count(),
         )
-    }
-}
-
-impl<const P: u64, const B: usize, T> Extend<T> for OneWay<P, B>
-where
-    Prime<P>: SupportedPrime,
-    BaseCount<B>: SupportedBaseCount,
-{
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        todo!()
     }
 }
